@@ -20,7 +20,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Table(name = "daily_trade_entries",
         uniqueConstraints = @UniqueConstraint(name = "uq_daily_trade_entries_business_date",
                 columnNames = {"business_id", "business_date"}))
-public class DailyTradeEntry {
+public class DailyTradeEntry implements Lockable {
 
     @Id
     @Column(name = "id", length = 36, nullable = false, updatable = false)
@@ -208,3 +208,4 @@ public class DailyTradeEntry {
         this.lockExpiresAt = lockExpiresAt;
     }
 }
+

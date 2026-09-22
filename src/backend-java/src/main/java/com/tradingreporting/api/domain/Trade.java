@@ -14,7 +14,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "trades")
-public class Trade {
+public class Trade implements Lockable {
 
     @Id
     @Column(name = "id", length = 36, nullable = false, updatable = false)
@@ -227,3 +227,4 @@ public class Trade {
         this.lockExpiresAt = lockExpiresAt;
     }
 }
+
