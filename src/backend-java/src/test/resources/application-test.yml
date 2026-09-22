@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb-${random.uuid};MODE=MSSQLServer;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-h2.sql
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    defer-datasource-initialization: false
+
+app:
+  jwt-secret: test-secret-key-for-contract-tests-only
+  seed-dev-users: false
+  dev-admin-password: DevAdmin123!
+  dev-trader-password: DevTrader123!
+  enable-scheduler: false
+  cors-origins: http://localhost:5173
+  trade-save-copy-path: ${java.io.tmpdir:/tmp}/trade-entry-copies-test

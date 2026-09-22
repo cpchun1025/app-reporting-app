@@ -1,0 +1,48 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: trading-reporting-api
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_absent
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        format_sql: false
+  datasource:
+    url: ${DATABASE_URL:jdbc:sqlserver://${MSSQL_HOST:localhost}:${MSSQL_PORT:1433};databaseName=${APP_DATABASE_NAME:trading_reporting};encrypt=${MSSQL_ENCRYPT:true};trustServerCertificate=${MSSQL_TRUST_SERVER_CERTIFICATE:false}}
+    username: ${MSSQL_SA_USER:sa}
+    password: ${MSSQL_SA_PASSWORD:}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+app:
+  jwt-secret: ${JWT_SECRET:local-development-secret-change-me}
+  jwt-algorithm: ${JWT_ALGORITHM:HS256}
+  access-token-expire-minutes: ${ACCESS_TOKEN_EXPIRE_MINUTES:60}
+  seed-dev-users: ${SEED_DEV_USERS:true}
+  dev-admin-password: ${DEV_ADMIN_PASSWORD:}
+  dev-trader-password: ${DEV_TRADER_PASSWORD:}
+  enable-scheduler: ${ENABLE_SCHEDULER:false}
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173}
+  trade-save-copy-path: ${TRADE_SAVE_COPY_PATH:./trade-entry-copies}
+  development-business-date: ${DEVELOPMENT_BUSINESS_DATE:2026-09-22}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+

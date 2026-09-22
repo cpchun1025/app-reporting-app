@@ -1,0 +1,6 @@
+# Seed profile: run once as an explicit command (e.g. `java -jar app.jar --spring.profiles.active=seed`)
+# to idempotently create development users, sample trades and daily trade entries, then exit.
+# Mirrors `python -m app.seed_command`.
+spring:
+  main:
+    web-application-type: none
