@@ -97,6 +97,25 @@ Docker Compose also starts the frontend on port 5173. Its default API URL is
 `http://localhost:8000`; this origin is allowed by the backend's configurable
 `CORS_ORIGINS` setting.
 
+The Python backend remains the default `backend` service. The alternative
+implementations consume the same SQL Server schema and API contract:
+
+```powershell
+# Python (existing workflow)
+docker compose up --build
+
+# .NET (select only the .NET backend and frontend)
+docker compose --profile dotnet up --build backend-dotnet frontend-dotnet
+
+# Java (select only the Java backend and frontend)
+docker compose --profile java up --build backend-java frontend-java
+```
+
+The alternative commands reuse the shared `db`, `db-init`, `migrations`, and
+`seed` dependency chain. Do not start multiple backend profiles together
+because they intentionally share host port 8000 and frontend port 5173.
+Confirm the selected implementation with `/health/ready` and its startup log.
+
 The frontend is an independent Vite application under `src/frontend`. Run
 `npm install; npm run dev` there for local development, or use the `frontend`
 service in Docker Compose. It provides the dark trading-workstation interface
@@ -156,6 +175,30 @@ set. It is retained untouched for now; assess and migrate any needed data in
 a separate, explicit change. New generated SQLite files are ignored.
 
 ## API summary
+
+### Compatibility inventory
+
+All three implementations are intended to expose the same externally visible
+contract. Authentication uses `Authorization: Bearer <JWT>` for protected
+routes; JWTs contain the user ID in `sub` and use the configured HMAC secret.
+Invalid credentials/tokens return `401`, validation errors return `422` in the
+Python reference behavior, missing resources return `404`, lock/optimistic
+concurrency conflicts return `409`, and unauthorized unlocks return `403`.
+
+| Area | Methods and paths | Contract |
+| --- | --- | --- |
+| Auth | `POST /auth/login`, `POST /auth/mock/callback`, `GET /auth/me` | Login returns `{access_token, token_type}`; `/me` returns `{username, role}`. |
+| Health | `GET /health`, `/health/live`, `/health/ready` | Liveness returns `{"status":"ok"}`; readiness returns `503` when SQL Server or `alembic_version` cannot be queried. |
+| Trades | `POST /trades`, `GET /trades`, `GET /trades/{id}`, `PUT /trades/{id}`, `DELETE /trades/{id}` | CRUD uses decimal quantity/price values and integer `version`; updates/deletes require `expected_version`. |
+| Trade locks | `POST /trades/{id}/lock`, `/unlock` | Database-backed ownership, 8-hour lease, owner/admin unlock, and `409` conflicts. |
+| Daily entry | `GET /trades?business_date=YYYY-MM-DD`, `GET /trades/entry?business_date=YYYY-MM-DD`, `POST /trades/entry/save` | Date-scoped rows expose `delta`, `gamma`, `theta`, `vega`, `pnl`, lock metadata, and version. |
+| Daily locks | `POST /trades/entry/{id}/lock`, `/unlock` | Same lock and authorization semantics as legacy trades. |
+| Reports | `GET /reports/daily`, `/monthly`, `/annual`, `/consolidated` | Require `start_date` and `end_date`; consolidated additionally accepts `group_by=account`. |
+
+The Python backend is the behavioral reference for exact Pydantic validation,
+JSON decimal/date/time serialization, error details, and report aggregation.
+The implementation-specific READMEs describe any framework metadata
+differences in OpenAPI documents.
 
 - `POST /auth/login` returns a bearer access token.
 - `GET /auth/me` returns the authenticated username and `admin` or `trader` role;

@@ -94,6 +94,42 @@ services:
       retries: 6
       start_period: 10s
 
+  backend-dotnet:
+    profiles: ["dotnet"]
+    build:
+      context: src/backend-dotnet
+      dockerfile: Dockerfile
+    environment: *backend-environment
+    ports:
+      - "8000:8000"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8000/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  backend-java:
+    profiles: ["java"]
+    build:
+      context: src/backend-java
+      dockerfile: Dockerfile
+    environment: *backend-environment
+    ports:
+      - "8000:8080"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
   frontend:
     build:
       context: src/frontend
@@ -102,6 +138,28 @@ services:
       - "5173:80"
     depends_on:
       backend:
+        condition: service_healthy
+
+  frontend-dotnet:
+    profiles: ["dotnet"]
+    build:
+      context: src/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      backend-dotnet:
+        condition: service_healthy
+
+  frontend-java:
+    profiles: ["java"]
+    build:
+      context: src/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      backend-java:
         condition: service_healthy
 
 volumes:

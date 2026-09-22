@@ -3,6 +3,7 @@ package com.tradingreporting.api.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -20,7 +21,8 @@ public class TradeEntrySnapshot {
     @Column(name = "business_date", nullable = false)
     private LocalDate businessDate;
 
-    @Column(name = "data_json", columnDefinition = "TEXT", nullable = false)
+    @Lob
+    @Column(name = "data_json", nullable = false)
     private String dataJson;
 
     @Column(name = "saved_by_id", length = 36, nullable = false, updatable = false)

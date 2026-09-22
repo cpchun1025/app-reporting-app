@@ -50,7 +50,7 @@ public class DailyTradeEntry implements Lockable {
 
     @Version
     @Column(name = "version", nullable = false)
-    private int version;
+    private int version = 1;
 
     @Column(name = "created_by_id", length = 36, nullable = false, updatable = false)
     private String createdById;

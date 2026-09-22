@@ -3,6 +3,7 @@ package com.tradingreporting.api.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
@@ -44,12 +45,13 @@ public class Trade implements Lockable {
     @Column(name = "status", length = 20, nullable = false)
     private String status;
 
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "notes")
     private String notes;
 
     @Version
     @Column(name = "version", nullable = false)
-    private int version;
+    private int version = 1;
 
     @Column(name = "created_by_id", length = 36, nullable = false, updatable = false)
     private String createdById;
