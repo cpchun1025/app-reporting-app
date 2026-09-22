@@ -11,16 +11,8 @@
         "-y",
         "@playwright/mcp@latest",
         "--isolated",
-        "--headless"
-      ]
-    },
-    "workspace-filesystem": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "${workspaceFolder}"
+        "--headless",
+        "--idle-timeout=300000"
       ]
     },
     "context7": {
@@ -30,6 +22,17 @@
     "microsoft-learn": {
       "type": "http",
       "url": "https://learn.microsoft.com/api/mcp"
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "env": {
+        "DISABLE_THOUGHT_LOGGING": "true"
+      }
     }
   }
 }
