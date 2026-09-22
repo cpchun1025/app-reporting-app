@@ -1,16 +1,13 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, true
 from sqlalchemy.orm import Session
 
 from app.models import DailyTradeEntry, Trade, TradingBusiness, User
 from app.security import hash_password
 
-DEV_USERS = (
-    ("dev_admin", "DevAdmin123!", True),
-    ("dev_trader", "DevTrader123!", False),
-)
+DEV_USERS = (("dev_admin", True), ("dev_trader", False))
 DEV_BUSINESSES = (
     ("Rates", "RATES"), ("Credit", "CREDIT"), ("Equities", "EQUITY"),
     ("Commodities", "CMDTY"), ("FX", "FX"), ("Macro", "MACRO"),
@@ -19,13 +16,20 @@ DEV_BUSINESSES = (
 )
 
 
-def seed_development_users(db: Session) -> None:
-    for username, password, is_admin in DEV_USERS:
+def seed_development_users(
+    db: Session, *, admin_password: str | None, trader_password: str | None
+) -> None:
+    if not admin_password or not trader_password:
+        raise RuntimeError(
+            "DEV_ADMIN_PASSWORD and DEV_TRADER_PASSWORD must be set when development seeding is enabled."
+        )
+    passwords = {"dev_admin": admin_password, "dev_trader": trader_password}
+    for username, is_admin in DEV_USERS:
         if db.scalar(select(User).where(User.username == username)) is None:
             db.add(
                 User(
                     username=username,
-                    password_hash=hash_password(password),
+                    password_hash=hash_password(passwords[username]),
                     is_admin=is_admin,
                 )
             )
@@ -72,7 +76,7 @@ def seed_daily_trade_entries(db: Session, business_date: date) -> None:
     businesses = list(
         db.scalars(
             select(TradingBusiness)
-            .where(TradingBusiness.is_active.is_(True))
+            .where(TradingBusiness.is_active == true())
             .order_by(TradingBusiness.code)
         )
     )

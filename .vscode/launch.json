@@ -2,6 +2,30 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Backend: Debug FastAPI",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${command:python.interpreterPath}",
+      "module": "uvicorn",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "app.main:app",
+        "--app-dir",
+        "src/backend",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src/backend"
+      },
+      "jinja": true,
+      "justMyCode": true,
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Frontend: Start Vite",
       "type": "node",
       "request": "launch",
@@ -52,6 +76,16 @@
         "<node_internals>/**",
         "**/node_modules/**"
       ]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full stack: Backend + Frontend + Edge",
+      "configurations": [
+        "Backend: Debug FastAPI",
+        "Frontend: Start Vite"
+      ],
+      "stopAll": true
     }
   ]
 }

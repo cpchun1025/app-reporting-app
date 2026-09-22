@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.exc import StaleDataError
@@ -122,7 +122,7 @@ def list_daily_trade_entries(
     businesses = list(
         db.scalars(
             select(TradingBusiness)
-            .where(TradingBusiness.is_active.is_(True))
+            .where(TradingBusiness.is_active == true())
             .order_by(TradingBusiness.code)
         )
     )

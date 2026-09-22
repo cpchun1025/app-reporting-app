@@ -1,8 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import get_settings
 from app.db import SessionLocal
@@ -20,7 +22,11 @@ async def lifespan(_: FastAPI):
     settings = get_settings()
     if settings.seed_dev_users:
         with SessionLocal() as db:
-            seed_development_users(db)
+            seed_development_users(
+                db,
+                admin_password=settings.dev_admin_password,
+                trader_password=settings.dev_trader_password,
+            )
             seed_sample_trades(db)
             seed_daily_trade_entries(db, settings.development_business_date)
     scheduler = None
@@ -53,4 +59,29 @@ app.include_router(reports_router)
 
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/health/live", tags=["health"])
+def health_live() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", tags=["health"])
+def health_ready() -> dict[str, str]:
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+            revision = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
+    except SQLAlchemyError as error:
+        logging.getLogger(__name__).warning("Database readiness check failed: %s", type(error).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database is not ready.",
+        ) from error
+    if revision is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database migrations are not ready.",
+        )
     return {"status": "ok"}

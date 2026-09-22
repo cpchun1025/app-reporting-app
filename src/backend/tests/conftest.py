@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 # The application lifespan should not seed its production-configured database during isolated tests.
 os.environ["SEED_DEV_USERS"] = "false"
+os.environ["DEV_ADMIN_PASSWORD"] = "DevAdmin123!"
+os.environ["DEV_TRADER_PASSWORD"] = "DevTrader123!"
 
 from app.db import Base, get_db
 from app.main import app
@@ -22,7 +24,11 @@ def db_session(tmp_path) -> Generator[Session, None, None]:
     testing_session = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     Base.metadata.create_all(engine)
     with testing_session() as session:
-        seed_development_users(session)
+        seed_development_users(
+            session,
+            admin_password=os.environ["DEV_ADMIN_PASSWORD"],
+            trader_password=os.environ["DEV_TRADER_PASSWORD"],
+        )
         seed_development_businesses(session)
         yield session
     Base.metadata.drop_all(engine)

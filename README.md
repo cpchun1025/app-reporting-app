@@ -12,22 +12,54 @@ summaries, a console email provider, and scheduled-job scaffolding.
    .\.venv\Scripts\Activate.ps1
    python -m pip install -r src\backend\requirements.txt
    ```
-2. Copy `.env.example` to `.env`. For a SQLite-only local smoke test, set
-   `DATABASE_URL=sqlite:///./trading.db`.
-3. Apply schema migrations:
+2. Copy `.env.example` to `.env` and set a strong `MSSQL_SA_PASSWORD` and
+   `JWT_SECRET`. The default SQL Server settings target the host instance; set
+   `DATABASE_URL` only for an explicit override such as isolated SQLite tests.
+3. Ensure the SQL Server application database exists:
+   ```powershell
+   .\sql\scripts\Initialize-Database.ps1
+   ```
+4. Apply schema migrations:
    ```powershell
    python -m alembic upgrade head
    ```
-4. Start the API:
+5. Set unique `DEV_ADMIN_PASSWORD` and `DEV_TRADER_PASSWORD` in `.env`, then
+   seed local development data (safe to rerun):
+   ```powershell
+   $env:PYTHONPATH = "$PWD\src\backend"
+   python -m app.seed_command
+   ```
+6. Start the API:
    ```powershell
    python -m uvicorn app.main:app --app-dir src/backend --reload
    ```
+
+For VS Code debugging, select the Python interpreter for the virtual
+environment, then use **Run and Debug** with **Backend: Debug FastAPI** or
+**Full stack: Backend + Frontend + Edge**. The full-stack configuration starts
+the FastAPI debugger, Vite, and a browser debugger together. Copy `.env.example`
+to `.env` first so the debugger can load the application settings.
 
 Seeded development users are `dev_admin` / `DevAdmin123!` and
 `dev_trader` / `DevTrader123!`. They are intentionally only seeded when
 `SEED_DEV_USERS=true`; replace or disable them outside local development.
 
-## Docker and SQL Server
+## SQL Server ownership and Docker startup
+
+The SQL Server bootstrap, Alembic migrations, and development seed data have
+separate responsibilities:
+
+- [`sql/bootstrap/00-create-database.sql`](./sql/bootstrap/00-create-database.sql)
+  connects to `master` and creates the configured application database only.
+- Alembic creates and upgrades all application tables: `users`, `trades`,
+  `trade_entry_snapshots`, `trading_businesses`, and `daily_trade_entries`.
+- `python -m app.seed_command` adds idempotent development users, businesses,
+  legacy sample trades, and date-scoped daily entries.
+
+This order matters: a health check can connect to `master` before
+`trading_reporting` exists, while Alembic cannot. Docker Compose therefore
+starts `db`, waits for its `master` health check, runs `db-init`, migrations,
+and seed data, then starts the backend and frontend.
 
 Copy `.env.example` to `.env`, optionally set `MSSQL_SA_PASSWORD`, then run:
 
@@ -35,7 +67,30 @@ Copy `.env.example` to `.env`, optionally set `MSSQL_SA_PASSWORD`, then run:
 docker compose up --build
 ```
 
-The backend container runs `alembic upgrade head` before serving on port 8000.
+To run each stage explicitly:
+
+```powershell
+docker compose up -d db
+docker compose ps
+docker compose run --rm db-init
+docker compose run --rm migrations
+docker compose run --rm seed
+docker compose up -d backend frontend
+docker compose logs db-init migrations seed backend
+```
+
+Linux/macOS uses the same Compose lifecycle:
+
+```sh
+cp .env.example .env
+# Set MSSQL_SA_PASSWORD, JWT_SECRET, DEV_ADMIN_PASSWORD, and DEV_TRADER_PASSWORD in .env.
+docker compose up -d db
+docker compose run --rm db-init
+docker compose run --rm migrations
+docker compose run --rm seed
+docker compose up -d backend frontend
+```
+
 The SQL Server connection uses the Microsoft ODBC Driver 18 and is compatible
 with SQL Server row locking (`UPDLOCK` emitted by SQLAlchemy's `with_for_update`).
 Docker Compose also starts the frontend on port 5173. Its default API URL is
@@ -49,6 +104,56 @@ with trade entry, daily, monthly, annual, and consolidated views. Trade Entry
 uses the browser's local calendar date and loads date-scoped rows from the API;
 it does not write files directly from the browser. Set `VITE_API_URL` when
 wiring a deployed backend.
+
+Verify the application database and tables from the SQL Server container:
+
+```powershell
+docker compose exec db /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$env:MSSQL_SA_PASSWORD" -d master -Q "SELECT name FROM sys.databases WHERE name = N'$env:APP_DATABASE_NAME';"
+docker compose exec db /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$env:MSSQL_SA_PASSWORD" -d "$env:APP_DATABASE_NAME" -Q "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME;"
+```
+
+Check the migration state from the backend image:
+
+```powershell
+docker compose run --rm migrations alembic current
+docker compose run --rm migrations alembic heads
+docker compose run --rm migrations alembic history
+```
+
+`/health/live` only confirms that the FastAPI process is running.
+`/health/ready` confirms it can query the application database and its
+Alembic version table without exposing connection details.
+
+### SQL Server diagnostics
+
+- SQL Server error **18456** indicates authentication failure. Confirm the
+  configured password, variable names, complexity requirements, and whether
+  the named volume was initialized with a different password.
+- Error **4060** indicates the requested application database is unavailable.
+  Run `db-init` against `master`, then migrations; do not treat it as a
+  missing-table error.
+- `Invalid object name` normally means migrations have not completed.
+
+Changing `MSSQL_SA_PASSWORD` in `.env` does **not** update an already
+initialized SQL Server named volume. Stop and inspect logs first:
+
+```powershell
+docker compose logs db db-init migrations
+docker compose down
+```
+
+**DEVELOPMENT ONLY — permanently deletes the SQL Server Docker volume and all
+databases stored in it:**
+
+```powershell
+docker compose down -v
+```
+
+The tracked [`trading.db`](./trading.db) is a legacy SQLite development
+artifact created by the old default Alembic URL. Current SQL Server startup
+does not use it unless `DATABASE_URL=sqlite:///./trading.db` is explicitly
+set. It is retained untouched for now; assess and migrate any needed data in
+a separate, explicit change. New generated SQLite files are ignored.
 
 ## API summary
 
@@ -105,3 +210,9 @@ The frontend production build is verified with:
 cd src/frontend
 npm run build
 ```
+
+The workspace MCP configuration is in
+[.vscode/mcp.json](./.vscode/mcp.json). It provides GitHub, Context7,
+Microsoft Learn, Playwright, and a workspace-scoped filesystem server. The
+filesystem server is restricted to `${workspaceFolder}`; do not broaden that
+path unless the MCP client is running in a trusted environment.

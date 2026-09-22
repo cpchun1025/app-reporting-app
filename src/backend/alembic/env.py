@@ -8,7 +8,12 @@ from app.db import Base
 import app.models  # noqa: F401 - registers model metadata
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# ConfigParser reserves `%` for interpolation. SQLAlchemy correctly URL-encodes
+# special characters in passwords, so escape percent signs only for Alembic's
+# configuration layer before it builds the engine.
+config.set_main_option(
+    "sqlalchemy.url", get_settings().sqlalchemy_database_url.replace("%", "%%")
+)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

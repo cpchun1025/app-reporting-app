@@ -1,35 +1,98 @@
 services:
-  sqlserver:
+  db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Your_strong_password123}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
       MSSQL_PID: Developer
     ports:
-      - "1433:1433"
+      - "${MSSQL_PORT:-1433}:1433"
     volumes:
       - sqlserver-data:/var/opt/mssql
     healthcheck:
-      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" || exit 1
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -d master -Q \"SELECT 1\" >/dev/null 2>&1"
+        ]
       interval: 10s
       timeout: 5s
       retries: 15
       start_period: 30s
 
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      MSSQL_HOST: db
+      MSSQL_PORT: 1433
+      MSSQL_SA_USER: ${MSSQL_SA_USER:-sa}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+      APP_DATABASE_NAME: ${APP_DATABASE_NAME:-trading_reporting}
+      SQLCMD_PATH: /opt/mssql-tools18/bin/sqlcmd
+      DATABASE_BOOTSTRAP_SQL: /workspace/sql/bootstrap/00-create-database.sql
+    volumes:
+      - ./sql:/workspace/sql:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/bash", "/workspace/sql/scripts/initialize-database.sh"]
+
+  migrations:
+    build:
+      context: .
+      dockerfile: src/backend/Dockerfile
+    environment: &backend-environment
+      MSSQL_HOST: db
+      MSSQL_PORT: 1433
+      MSSQL_SA_USER: ${MSSQL_SA_USER:-sa}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+      APP_DATABASE_NAME: ${APP_DATABASE_NAME:-trading_reporting}
+      MSSQL_ENCRYPT: "true"
+      MSSQL_TRUST_SERVER_CERTIFICATE: "true"
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      SEED_DEV_USERS: ${SEED_DEV_USERS:-true}
+      DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
+      DEV_TRADER_PASSWORD: ${DEV_TRADER_PASSWORD:-}
+      ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      TRADE_SAVE_COPY_PATH: ${TRADE_SAVE_COPY_PATH:-/app/trade-entry-copies}
+      DEVELOPMENT_BUSINESS_DATE: ${DEVELOPMENT_BUSINESS_DATE:-2026-09-22}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+
+  seed:
+    build:
+      context: .
+      dockerfile: src/backend/Dockerfile
+    environment: *backend-environment
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    restart: "no"
+    command: ["python", "-m", "app.seed_command"]
+
   backend:
     build:
       context: .
       dockerfile: src/backend/Dockerfile
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      DATABASE_URL: mssql+pyodbc://sa:${MSSQL_SA_PASSWORD:-Your_strong_password123}@sqlserver:1433/trading_reporting?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+    environment: *backend-environment
     ports:
       - "8000:8000"
     depends_on:
-      sqlserver:
-        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health/ready').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
 
   frontend:
     build:
@@ -38,7 +101,8 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   sqlserver-data:

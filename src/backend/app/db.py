@@ -15,7 +15,8 @@ def _connect_args(database_url: str) -> dict[str, object]:
 
 
 settings = get_settings()
-engine = create_engine(settings.database_url, connect_args=_connect_args(settings.database_url))
+database_url = settings.sqlalchemy_database_url
+engine = create_engine(database_url, connect_args=_connect_args(database_url))
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

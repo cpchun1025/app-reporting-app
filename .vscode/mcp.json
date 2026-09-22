@@ -10,7 +10,17 @@
       "args": [
         "-y",
         "@playwright/mcp@latest",
-        "--isolated"
+        "--isolated",
+        "--headless"
+      ]
+    },
+    "workspace-filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${workspaceFolder}"
       ]
     },
     "context7": {
