@@ -1,3 +1,4 @@
+from datetime import date
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,6 +15,7 @@ class Settings(BaseSettings):
     enable_scheduler: bool = False
     cors_origins: str = "http://localhost:5173"
     trade_save_copy_path: str = "./trade-entry-copies"
+    development_business_date: date = date(2026, 9, 22)
 
     @property
     def cors_origin_list(self) -> list[str]:

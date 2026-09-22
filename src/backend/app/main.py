@@ -9,7 +9,7 @@ from app.db import SessionLocal
 from app.routes_auth import router as auth_router
 from app.routes_reports import router as reports_router
 from app.routes_trades import router as trades_router
-from app.seed import seed_development_users, seed_sample_trades
+from app.seed import seed_daily_trade_entries, seed_development_users, seed_sample_trades
 from app.services import ConsoleEmailProvider, ScheduledJobs, configure_scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +22,7 @@ async def lifespan(_: FastAPI):
         with SessionLocal() as db:
             seed_development_users(db)
             seed_sample_trades(db)
+            seed_daily_trade_entries(db, settings.development_business_date)
     scheduler = None
     if settings.enable_scheduler:
         scheduler = configure_scheduler(ScheduledJobs(ConsoleEmailProvider()))

@@ -11,7 +11,7 @@ os.environ["SEED_DEV_USERS"] = "false"
 
 from app.db import Base, get_db
 from app.main import app
-from app.seed import seed_development_users
+from app.seed import seed_development_businesses, seed_development_users
 
 
 @pytest.fixture
@@ -23,6 +23,7 @@ def db_session(tmp_path) -> Generator[Session, None, None]:
     Base.metadata.create_all(engine)
     with testing_session() as session:
         seed_development_users(session)
+        seed_development_businesses(session)
         yield session
     Base.metadata.drop_all(engine)
 

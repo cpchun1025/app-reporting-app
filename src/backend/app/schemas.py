@@ -80,6 +80,54 @@ class TradeEntrySaveResponse(BaseModel):
     row_count: int
 
 
+class DailyTradeEntryRow(BaseModel):
+    id: str = Field(min_length=1, max_length=36)
+    expected_version: int = Field(ge=1)
+    delta: Decimal = Field(max_digits=20, decimal_places=4)
+    gamma: Decimal = Field(max_digits=20, decimal_places=4)
+    theta: Decimal = Field(max_digits=20, decimal_places=4)
+    vega: Decimal = Field(max_digits=20, decimal_places=4)
+    pnl: Decimal = Field(max_digits=20, decimal_places=4)
+
+
+class DailyTradeEntrySaveRequest(BaseModel):
+    business_date: date
+    rows: list[DailyTradeEntryRow] = Field(min_length=1, max_length=500)
+
+
+class DailyTradeEntryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    business_id: str
+    business_date: date
+    name: str
+    code: str
+    delta: Decimal
+    gamma: Decimal
+    theta: Decimal
+    vega: Decimal
+    pnl: Decimal
+    version: int
+    locked: bool
+    locked_by_id: str | None
+    locked_by_display_name: str | None
+    locked_at: datetime | None
+    lock_expires_at: datetime | None
+    updated_at: datetime | None
+
+
+class DailyTradeEntrySaveResponse(BaseModel):
+    saved_at: datetime
+    business_date: date
+    rows: list[DailyTradeEntryResponse]
+
+
+class DailyTradeEntryListResponse(BaseModel):
+    business_date: date
+    rows: list[DailyTradeEntryResponse]
+
+
 class LockResponse(BaseModel):
     id: str
     locked: bool

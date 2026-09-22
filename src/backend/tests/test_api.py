@@ -1,6 +1,9 @@
 from datetime import date
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+
+from app.models import TradeEntrySnapshot
 
 
 def trade_payload(**overrides: object) -> dict[str, object]:
@@ -101,7 +104,9 @@ def test_reports_reject_invalid_date_range(client: TestClient, auth_headers: dic
     assert response.json()["detail"] == "end_date must be on or after start_date."
 
 
-def test_trade_entry_save_creates_server_copy(client: TestClient, auth_headers: dict[str, str], tmp_path, monkeypatch) -> None:
+def test_trade_entry_save_creates_server_copy(
+    client: TestClient, auth_headers: dict[str, str], db_session, tmp_path, monkeypatch
+) -> None:
     monkeypatch.setenv("TRADE_SAVE_COPY_PATH", str(tmp_path / "copies"))
     from app.config import get_settings
 
@@ -115,6 +120,9 @@ def test_trade_entry_save_creates_server_copy(client: TestClient, auth_headers: 
     copies = list((tmp_path / "copies").glob("trade-entry-*.json"))
     assert len(copies) == 1
     assert copies[0].read_text(encoding="utf-8").find('"business_date": "2026-09-22"') >= 0
+    assert db_session.scalar(select(TradeEntrySnapshot).where(
+        TradeEntrySnapshot.business_date == date(2026, 9, 22)
+    )) is not None
     get_settings.cache_clear()
 
 

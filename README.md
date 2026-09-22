@@ -45,9 +45,10 @@ Docker Compose also starts the frontend on port 5173. Its default API URL is
 The frontend is an independent Vite application under `src/frontend`. Run
 `npm install; npm run dev` there for local development, or use the `frontend`
 service in Docker Compose. It provides the dark trading-workstation interface
-with trade entry, daily, monthly, annual, and consolidated views. The UI ships
-with seeded demo state so it can be explored before an API is configured;
-set `VITE_API_URL` when wiring a deployed backend.
+with trade entry, daily, monthly, annual, and consolidated views. Trade Entry
+uses the browser's local calendar date and loads date-scoped rows from the API;
+it does not write files directly from the browser. Set `VITE_API_URL` when
+wiring a deployed backend.
 
 ## API summary
 
@@ -58,10 +59,34 @@ set `VITE_API_URL` when wiring a deployed backend.
   local user name for a bearer token.
 - `POST /trades`, `GET /trades/{id}`, `PUT /trades/{id}`, and
   `DELETE /trades/{id}` require a bearer token.
+- `GET /trades?business_date=YYYY-MM-DD` returns a date-scoped row for each
+  active trading business, initializing missing daily rows safely with zero
+  metrics. Each row exposes explicit `delta`, `gamma`, `theta`, `vega`, and
+  `pnl` values.
+- `GET /trades/entry?business_date=YYYY-MM-DD` returns the same date-scoped
+  rows in a response wrapper for clients that need the business date echoed.
+- `POST /trades/entry/save` accepts an atomic daily-entry payload containing
+  `business_date` and rows with an `id`, `expected_version`, and all five
+  explicit metrics. Rows locked by another user or stale versions receive
+  `409 Conflict`; `POST /trades/{id}/lock` and `/unlock` work for both legacy
+  trades and date-scoped daily rows.
 - Updates and deletes require `expected_version`; conflicting versions receive
   `409 Conflict`.
 - `GET /reports/daily`, `/reports/monthly`, `/reports/annual`, and
   `/reports/consolidated` return protected aggregate trade reports.
+
+Set `TRADE_SAVE_COPY_PATH` to an absolute server-side directory (for example
+`C:/scripts/trade-entry`). Each successful daily save creates the directory if
+needed and writes an atomically replaced, timestamped JSON snapshot containing
+the business date and saved metrics. Database persistence and the snapshot
+write must both succeed before the API reports success; the API returns a
+generic file-save error without exposing the physical path.
+
+For SQL Server troubleshooting, check readiness and service logs with
+`docker compose ps` and `docker compose logs sqlserver backend`. To recreate
+development data only, stop the stack and remove the named `sqlserver-data`
+volume before running migrations again; do not do this against shared or
+production data.
 
 Run backend tests from the repository root with:
 
